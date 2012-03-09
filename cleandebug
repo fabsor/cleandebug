@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
-from src.cleandebug import *
+from src.debugger import *
+from src.ui import CursesUI
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('dbgp debugger for PHP scripts.')
