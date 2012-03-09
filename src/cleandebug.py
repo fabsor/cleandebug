@@ -1,6 +1,5 @@
-import socket
 import SocketServer
-from xml.dom.minidom import parse, parseString
+from xml.dom.minidom import parseString
 from base64 import b64encode
 import argparse
 import os
@@ -24,7 +23,7 @@ class DBGPTCPHandler(SocketServer.BaseRequestHandler):
         self.transaction_id = 1;
         dbgp = DebuggerConnection(self.request, self.transaction_id)
         self.server.connection_fn(dbgp)
-                
+
 class DebuggerConnection:
     """
     This is an implementation of the DBGP protocol.
@@ -40,7 +39,7 @@ class DebuggerConnection:
         Set a breakpoint
         @return: The id of the newly set breakpoint.
         """
-        command = "breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(self.transaction_id, type, lineNumber, file, state) 
+        command = "breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(self.transaction_id, type, lineNumber, file, state)
         if function:
             command = "{0} -m {1}".format(command, function)
         if exception:
@@ -56,11 +55,11 @@ class DebuggerConnection:
         id = self.execute_command(command).getElementsByTagName("response")[0].getAttribute('id')
         self.breakpoints[id] = id
         return id
-        
+
     def execute_command(self, command):
         self.connection.sendall(command)
         return self.receive()
-        
+
     def receive(self):
         data = self.connection.recv(self.receive_size())
         self.connection.recv(1)
@@ -96,17 +95,17 @@ class DebuggerConnection:
 
 class Debugger:
     def __init__(self, base_path, ui, port=9000, host="127.0.0.1"):
-        self.base_path = base_path 
+        self.base_path = base_path
         self.ui = ui
         self.port = 9000
         self.host = host
-        
+
     def listen(self):
-        server = DBGPServer((host, int(args.port)), self.handleConnection)
+        server = DBGPServer((host, int(args.port)), self.handle_connection)
         self.ui.print_message("Listening on {}:{}".format(self.host, self.port))
         server.serve_forever()
-        
-    def handleConnection(self, con):
+
+    def handle_connection(self, con):
         self.con = con
         file = self.find_file(con.fileUri)
         self.ui.print_file(file, self.open_file(file))
@@ -123,7 +122,7 @@ class Debugger:
             if os.path.exists(current_path):
                 return current_path
         return False
-    
+
     def open_file(self, file):
         try:
             handle = open(file)
@@ -135,7 +134,7 @@ class DebuggerOperation:
     """
     Represents an operation that can be chosen by the user to be executed.
     """
-    def __init(self, debugger, name, operation, *params):
+    def __init__(self, debugger, name, operation, *params):
         self.debugger = debugger
         self.name = name
         self.operation = operation
@@ -144,25 +143,25 @@ class DebuggerOperation:
         self.operation(params)
 
 class RunOperation(DebuggerOperation):
-    
-    def __init(self, debugger, name):
-        DebuggerOperation.__init(self, debugger, name)
-    
+
+    def __init__(self, debugger, name):
+        DebuggerOperation.__init__(self, debugger, name)
+
 
 class CursesUI:
     """
     A curses UI for the debugger.
     """
-    def __init__(self, operations):
+    def __init__(self):
         self.scr = curses.initscr()
         self.operations = {}
         curses.cbreak()
         self.scr.keypad(1)
-    
-       
+
+
     def menu(self):
         return ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"];
-        
+
     def header(self, message, show_menu = True):
         max = self.scr.getmaxyx()
         pos = 0
@@ -179,7 +178,7 @@ class CursesUI:
         self.scr.clear()
         self.header(message, False)
         self.scr.refresh()
-    
+
     def print_file(self, file_name, file, breakpoints = {}):
         self.scr.clear()
         self.header(file_name)
@@ -188,19 +187,19 @@ class CursesUI:
             self.scr.addstr(i, 0, line, curses.COLOR_GREEN)
             i += 1
         self.scr.refresh()
-    
+
     def prompt(self):
         result = self.scr.getkey()
         if (result == "o"):
             self.print_message("Enter the path to the file to open")
-        
+
     def __del__(self):
         curses.nocbreak()
         self.scr.keypad(0)
         curses.echo()
-        curses.endwin()      
+        curses.endwin()
 
-if __name__ == "__main__":               
+if __name__ == "__main__":
     parser = argparse.ArgumentParser('dbgp debugger for PHP scripts.')
     parser.add_argument('--port', action='store', default=9000, help='Port (defaults to 9000)')
     parser.add_argument('path', action='store', help="The directory to look for scripts in.", default='.')
