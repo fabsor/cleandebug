@@ -1,16 +1,24 @@
 import SocketServer
+import threading
 from xml.dom.minidom import parseString
 from base64 import b64encode
 import os
 
+class DBGPThread(threading.Thread):
+    def __init__(self, connection, connection_fn):
+        threading.Thread.__init__(self)
+        self.server = DBGPServer(connection, connection_fn)
+
+    def run(self):
+        self.server.serve_forever()
+
+    def stop(self):
+        self.server.shutdown()
+
 class DBGPServer(SocketServer.TCPServer):
-    """
-    A DBGP server class that can be used by any client to get notified about commands.
-    """
     def __init__(self, connection, connection_fn):
         SocketServer.TCPServer.__init__(self, connection, DBGPTCPHandler)
         self.connection_fn = connection_fn
-
 
 class DBGPTCPHandler(SocketServer.BaseRequestHandler):
     """
@@ -95,19 +103,25 @@ class Debugger:
     def __init__(self, base_path, ui, port=9000, host="127.0.0.1"):
         self.base_path = base_path
         self.ui = ui
+        self.ui.set_debugger(self)
         self.port = 9000
         self.host = host
+        self.thread = None
 
-    def listen(self):
-        server = DBGPServer((self.host, int(self.port)), self.handle_connection)
+    def start(self):
+        self.thread = DBGPThread((self.host, int(self.port)), self.handle_connection)
         self.ui.print_message("Listening on {}:{}".format(self.host, self.port))
-        server.serve_forever()
+        self.thread.start()
+
+    def stop(self):
+        self.thread.stop()
+        self.ui.stop()
 
     def handle_connection(self, con):
         self.con = con
         file = self.find_file(con.fileUri)
         self.ui.print_file(file, self.open_file(file))
-        action = self.ui.prompt()
+        # action = self.ui.prompt()
 
     def find_file(self, fileUri):
         # Split the path into path

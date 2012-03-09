@@ -12,6 +12,9 @@ if __name__ == "__main__":
     debugger = Debugger(args.path, CursesUI(), args.port, args.host)
 
     try:
-        debugger.listen()
+        debugger.start()
+        debugger.ui.start()
     except KeyboardInterrupt:
-        del debugger
+        pass
+
+    debugger.stop()

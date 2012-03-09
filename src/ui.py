@@ -6,11 +6,14 @@ class CursesUI:
     """
     def __init__(self):
         self.scr = curses.initscr()
+        self.debugger = None
         self.operations = {}
         curses.cbreak()
         curses.noecho()
         self.scr.keypad(1)
 
+    def set_debugger(self, debugger):
+        self.debugger = debugger # Maybe move to the constructor?
 
     def menu(self):
         return ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"];
@@ -43,10 +46,18 @@ class CursesUI:
 
     def prompt(self):
         result = self.scr.getkey()
-        if (result == "o"):
+        if result == "o":
             self.print_message("Enter the path to the file to open")
+        elif result == "x":
+            self.print_message("yoyoyoyo")
 
-    def __del__(self):
+    def start(self):
+        run = True
+
+        while run:
+            self.prompt()
+
+    def stop(self):
         curses.nocbreak()
         self.scr.keypad(0)
         curses.echo()
