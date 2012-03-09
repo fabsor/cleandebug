@@ -1,7 +1,6 @@
 import SocketServer
 from xml.dom.minidom import parseString
 from base64 import b64encode
-import argparse
 import os
 import curses
 
@@ -101,7 +100,7 @@ class Debugger:
         self.host = host
 
     def listen(self):
-        server = DBGPServer((host, int(args.port)), self.handle_connection)
+        server = DBGPServer((self.host, int(self.port)), self.handle_connection)
         self.ui.print_message("Listening on {}:{}".format(self.host, self.port))
         server.serve_forever()
 
@@ -199,11 +198,3 @@ class CursesUI:
         curses.echo()
         curses.endwin()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser('dbgp debugger for PHP scripts.')
-    parser.add_argument('--port', action='store', default=9000, help='Port (defaults to 9000)')
-    parser.add_argument('path', action='store', help="The directory to look for scripts in.", default='.')
-    host = "127.0.0.1"
-    args = parser.parse_args()
-    debugger = Debugger(args.path, CursesUI(), args.port)
-    debugger.listen()

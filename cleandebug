@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+import argparse
+from src.cleandebug import *
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser('dbgp debugger for PHP scripts.')
+    parser.add_argument('--host', action='store', default='127.0.0.1', help='Host (defaults to 127.0.0.1)')
+    parser.add_argument('--port', action='store', default=9000, help='Port (defaults to 9000)')
+    parser.add_argument('path', action='store', help="The directory to look for scripts in.", default='.')
+    args = parser.parse_args()
+    debugger = Debugger(args.path, CursesUI(), args.port, args.host)
+    debugger.listen()
