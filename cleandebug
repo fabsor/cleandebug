@@ -10,4 +10,8 @@ if __name__ == "__main__":
     parser.add_argument('path', action='store', help="The directory to look for scripts in.", default='.')
     args = parser.parse_args()
     debugger = Debugger(args.path, CursesUI(), args.port, args.host)
-    debugger.listen()
+
+    try:
+        debugger.listen()
+    except KeyboardInterrupt:
+        del debugger

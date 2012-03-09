@@ -8,6 +8,7 @@ class CursesUI:
         self.scr = curses.initscr()
         self.operations = {}
         curses.cbreak()
+        curses.noecho()
         self.scr.keypad(1)
 
 
