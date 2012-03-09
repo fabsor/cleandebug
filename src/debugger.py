@@ -141,6 +141,9 @@ class DebuggerOperation:
         self.operation(self.params)
 
 class RunOperation(DebuggerOperation):
+    def __init__(self, debugger, name):
+        DebuggerOperation.__init__(self, debugger, name)
 
+class BreakPointOperation(DebuggerOperation):
     def __init__(self, debugger, name):
         DebuggerOperation.__init__(self, debugger, name)
