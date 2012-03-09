@@ -11,6 +11,7 @@ class CursesUI:
         curses.cbreak()
         curses.noecho()
         self.scr.keypad(1)
+        self.run = True
 
     def set_debugger(self, debugger):
         self.debugger = debugger # Maybe move to the constructor?
@@ -50,14 +51,14 @@ class CursesUI:
             self.print_message("Enter the path to the file to open")
         elif result == "x":
             self.print_message("yoyoyoyo")
+            self.debugger.stop()
 
     def start(self):
-        run = True
-
-        while run:
+        while self.run:
             self.prompt()
 
     def stop(self):
+        self.run = False
         curses.nocbreak()
         self.scr.keypad(0)
         curses.echo()

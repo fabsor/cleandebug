@@ -15,6 +15,6 @@ if __name__ == "__main__":
         debugger.start()
         debugger.ui.start()
     except KeyboardInterrupt:
-        pass
+        debugger.stop()
 
-    debugger.stop()
+    #debugger.stop()

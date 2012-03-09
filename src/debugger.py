@@ -13,7 +13,9 @@ class DBGPThread(threading.Thread):
         self.server.serve_forever()
 
     def stop(self):
-        self.server.shutdown()
+        # self.server.shutdown()
+        print "Die!"
+        del self.server
 
 class DBGPServer(SocketServer.TCPServer):
     def __init__(self, connection, connection_fn):
@@ -114,7 +116,9 @@ class Debugger:
         self.thread.start()
 
     def stop(self):
+        self.ui.print_message("SHUTTING DOWN")
         self.thread.stop()
+        del self.thread
         self.ui.stop()
 
     def handle_connection(self, con):
