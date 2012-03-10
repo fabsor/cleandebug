@@ -13,6 +13,8 @@ if __name__ == "__main__":
         parser.error("You need to specify a path")
     ui = CursesUI();
     debugger = Debugger(args[0], ui, options.port, options.host)
-    debugger.start()
-    ui.start()
-    debugger.stop()
+    try:
+        debugger.start()
+        ui.start()
+    finally:
+        debugger.stop()
