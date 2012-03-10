@@ -11,11 +11,8 @@ if __name__ == "__main__":
     options, args = parser.parse_args()
     if len(args) < 1:
         parser.error("You need to specify a path")
-    debugger = Debugger(args[0], CursesUI(), options.port, options.host)
-    try:
-        debugger.start()
-        debugger.ui.start()
-    except KeyboardInterrupt:
-        debugger.stop()
-
-    #debugger.stop()
+    ui = CursesUI();
+    debugger = Debugger(args[0], ui, options.port, options.host)
+    debugger.start()
+    ui.start()
+    debugger.stop()

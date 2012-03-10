@@ -13,9 +13,8 @@ class DBGPThread(threading.Thread):
         self.server.serve_forever()
 
     def stop(self):
-        # self.server.shutdown()
-        print "Die!"
-        del self.server
+        self.server.shutdown()
+
 
 class DBGPServer(SocketServer.TCPServer):
     def __init__(self, connection, connection_fn):
@@ -84,10 +83,10 @@ class DebuggerConnection:
         return int(size)
 
     def status(self):
-        return self.execute_command("status -i {}\0".format(self.transaction_id)).getElementsByTagName("response")[0].getAttribute('status')
+        return self.execute_command("status -i {0}\0".format(self.transaction_id)).getElementsByTagName("response")[0].getAttribute('status')
 
     def run(self):
-        return self.execute_command("run -i {}\0".format(self.transaction_id)).getElementsByTagName("response")[0].getAttribute('status')
+        return self.execute_command("run -i {0}\0".format(self.transaction_id)).getElementsByTagName("response")[0].getAttribute('status')
 
     def initialize(self):
         dom = self.receive()
@@ -105,20 +104,18 @@ class Debugger:
     def __init__(self, base_path, ui, port=9000, host="127.0.0.1"):
         self.base_path = base_path
         self.ui = ui
-        self.ui.set_debugger(self)
         self.port = 9000
         self.host = host
         self.thread = None
 
     def start(self):
         self.thread = DBGPThread((self.host, int(self.port)), self.handle_connection)
-        self.ui.print_message("Listening on {}:{}".format(self.host, self.port))
+        self.ui.print_message(u"Listening")
         self.thread.start()
 
     def stop(self):
         self.ui.print_message("SHUTTING DOWN")
         self.thread.stop()
-        del self.thread
         self.ui.stop()
 
     def handle_connection(self, con):
@@ -134,9 +131,10 @@ class Debugger:
         # The first three parts are useless since the return values of dbgp
         # are file:///.
         for i in range(len(parts[3:])):
-            current_path = "{}/{}".format(self.base_path, parts[i+3])
-            if os.path.exists(current_path):
-                return current_path
+            if len(parts) > i+3:
+                current_path = "{0}/{1}".format(self.base_path, parts[i+3])
+                if os.path.exists(current_path):
+                    return current_path
         return False
 
     def open_file(self, file):

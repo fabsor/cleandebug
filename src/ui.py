@@ -1,17 +1,15 @@
-import curses
+import urwid
 
 class CursesUI:
     """
     A curses UI for the debugger.
     """
     def __init__(self):
-        self.scr = curses.initscr()
         self.debugger = None
+        self.currentMessage = ""
+        self.messageBox = urwid.Text(self.currentMessage, wrap='clip')
+        self.content = urwid.SimpleListWalker([])
         self.operations = {}
-        curses.cbreak()
-        curses.noecho()
-        self.scr.keypad(1)
-        self.run = True
 
     def set_debugger(self, debugger):
         self.debugger = debugger # Maybe move to the constructor?
@@ -19,31 +17,14 @@ class CursesUI:
     def menu(self):
         return ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"];
 
-    def header(self, message, show_menu = True):
-        max = self.scr.getmaxyx()
-        pos = 0
-        self.scr.hline(0, 0, curses.ACS_HLINE, max[1])
-        if show_menu:
-            for item in self.menu():
-                self.scr.addstr(1, pos, item)
-                self.scr.addstr(1, pos + len(item) + 1, '|')
-                pos += len(item) + 3;
-        self.scr.addstr(1, max[1]-(len(message)+1), message)
-        self.scr.hline(2, 0, curses.ACS_HLINE, max[1])
-
     def print_message(self, message):
-        self.scr.clear()
-        self.header(message, False)
-        self.scr.refresh()
+        self.currentMessage = message
+        self.messageBox.set_text(self.currentMessage)
 
-    def print_file(self, file_name, file, breakpoints = {}):
-        self.scr.clear()
-        self.header(file_name)
-        i = 3
-        for line in file.split('\n'):
-            self.scr.addstr(i, 0, line, curses.COLOR_GREEN)
-            i += 1
-        self.scr.refresh()
+    def print_file(self, file_name, content, breakpoints = {}):
+        self.print_message(file_name)
+        for line in content.split('\n'):
+            self.content.append(urwid.Text(line, wrap='clip'))
 
     def prompt(self):
         result = self.scr.getkey()
@@ -54,12 +35,29 @@ class CursesUI:
             self.debugger.stop()
 
     def start(self):
-        while self.run:
-            self.prompt()
+        palette = [('header', 'white', 'black'),
+                   ('reveal focus', 'black', 'dark cyan', 'standout'),]
+        head = urwid.AttrMap(self.messageBox, 'header')
+        self.listbox = urwid.ListBox(self.content)
+        top = urwid.Frame(self.listbox, head)
+        self.loop = urwid.MainLoop(top, palette,
+                              input_filter=self.show_all_input, unhandled_input=self.exit_on_cr)
+        self.loop.run()
+
+        
+    def show_all_input(self, input, raw):
+        self.print_message(self.currentMessage)
+        #self.messageBox.set_text(u"Pressed: " + u" ".join([
+        #unicode(i) for i in input]))
+        return input
+
+    def exit_on_cr(self, input):
+        if input == 'enter':
+            raise urwid.ExitMainLoop()
+            self.stop()
+        if input == 'down':
+            self.listbox.set_focus(1)
 
     def stop(self):
         self.run = False
-        curses.nocbreak()
-        self.scr.keypad(0)
-        curses.echo()
-        curses.endwin()
+
