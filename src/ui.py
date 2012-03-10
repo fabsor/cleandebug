@@ -47,18 +47,11 @@ class CursesUI:
         columns = urwid.Columns(self.menu())
         self.listbox = urwid.ListBox(self.content)
         top = urwid.Frame(self.listbox, head, columns)
-        self.loop = urwid.MainLoop(top, palette,
-                              input_filter=self.show_all_input, unhandled_input=self.exit_on_cr)
+        self.loop = urwid.MainLoop(top, palette, unhandled_input=self.handle_input)
         self.loop.run()
 
-        
-    def show_all_input(self, input, raw):
-        self.print_message(self.currentMessage)
-        #self.messageBox.set_text(u"Pressed: " + u" ".join([
-        #unicode(i) for i in input]))
-        return input
 
-    def exit_on_cr(self, input):
+    def handle_input(self, input):
         if input == 'enter':
             raise urwid.ExitMainLoop()
             self.stop()
