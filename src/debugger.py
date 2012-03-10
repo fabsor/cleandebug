@@ -107,6 +107,7 @@ class Debugger:
         self.port = 9000
         self.host = host
         self.thread = None
+        ui.set_debugger(self)
 
     def start(self):
         self.thread = DBGPThread((self.host, int(self.port)), self.handle_connection)
@@ -137,7 +138,9 @@ class Debugger:
                     return current_path
         return False
 
-    def open_file(self, file):
+    def open_file(self, file, relative=False):
+        if relative:
+            file = "{0}/{1}".format(self.base_path, file)
         try:
             handle = open(file)
             return handle.read()
