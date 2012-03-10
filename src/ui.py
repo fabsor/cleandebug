@@ -1,5 +1,5 @@
 import urwid
-
+import debugger
 class CursesUI:
     """
     A curses UI for the debugger.
@@ -15,6 +15,7 @@ class CursesUI:
         self.stateMachine.add_mode(OpenFileMode(self))
         self.stateMachine.add_mode(FileExplorerMode(self))
         self.stateMachine.add_mode(ExitMode(self))
+        self.stateMachine.add_mode(RunMode(self))
         self.focus = 0;
 
     def set_debugger(self, debugger):
@@ -110,6 +111,19 @@ class ExitMode(Mode):
 
     def __str__(self):
         return "ExitMode"
+    
+class RunMode(Mode):
+    def __init__(self, ui):
+        self.ui = ui
+        
+    def evaluate(self, text):
+        return text == 'r' and self.ui.debugger.is_connected()
+    
+    def enter(self, stateMachine):
+        self.ui.debugger.execute_operation(debugger.RunOperation(self.ui.debugger))
+
+    def __str__(self):
+        return "RunMode"
 
 class FileExplorerMode(Mode):
     def __init__(self, ui):

@@ -40,7 +40,7 @@ class DebuggerConnection:
         self.transaction_id = transaction_id
         self.breakpoints = {}
         self.initialize()
-
+        
     def set_breakpoint(self, file, lineNumber=-1, type="line", state="enabled", function=None, exception=None, hit_value=0, hit_condition=None, temporary=0, expression=None):
         """
         Set a breakpoint
@@ -107,7 +107,15 @@ class Debugger:
         self.port = 9000
         self.host = host
         self.thread = None
+        self.running = False
+        self.connected = False
+        self.operations = []
+        self.operation_event = threading.Event()
+        self.operation_lock = threading.Lock()
         ui.set_debugger(self)
+
+    def is_connected(self):
+        return self.connected
 
     def start(self):
         self.thread = DBGPThread((self.host, int(self.port)), self.handle_connection)
@@ -115,16 +123,46 @@ class Debugger:
         self.thread.start()
 
     def stop(self):
+        self.release()
         self.ui.print_message("SHUTTING DOWN")
-        self.thread.stop()
+        if self.thread:
+            self.thread.stop()
         self.ui.stop()
-
+    
+    def execute_operation(self, operation):
+        with self.operation_lock:
+            self.operations.append(operation)
+        self.operation_event.set()
+        
+    
     def handle_connection(self, con):
         self.con = con
+        self.connected = True
         file = self.find_file(con.fileUri)
         self.ui.print_file(file, self.open_file(file))
-        # action = self.ui.prompt()
+        self.run()
+    
+    def run(self):
+        """
+        Run loop.
+        """
+        self.running = True
+        while self.running:
+            self.execute_operations()
+            self.operation_event.wait()
 
+    def execute_operations(self):
+        while len(self.operations) > 0:
+            with self.operation_lock:
+                item = self.operations.pop();
+            item.run()
+    
+    def release(self):
+        """
+        Release any locks we might have.
+        """
+        self.running = False
+            
     def find_file(self, fileUri):
         # Split the path into path
         parts = str(fileUri).split('/')
@@ -147,22 +185,19 @@ class Debugger:
         except:
             return False
 
-class DebuggerOperation:
-    """
-    Represents an operation that can be chosen by the user to be executed.
-    """
-    def __init__(self, debugger, name, operation, *params):
+class RunOperation():
+    def __init__(self, debugger):
         self.debugger = debugger
-        self.name = name
-        self.operation = operation
-        self.params = params
+    
     def run(self):
-        self.operation(self.params)
+        result = self.debugger.con.run()
+        self.debugger.ui.print_message(result)
 
-class RunOperation(DebuggerOperation):
-    def __init__(self, debugger, name):
-        DebuggerOperation.__init__(self, debugger, name)
-
-class BreakPointOperation(DebuggerOperation):
-    def __init__(self, debugger, name):
-        DebuggerOperation.__init__(self, debugger, name)
+class BreakPointOperation():
+    def __init__(self, debugger, file, **args):
+        self.debugger = debugger
+        self.file = file
+        self.args = args
+    
+    def run(self):
+        self.debugger.con.set_breakpoint(self.file, self.args)
