@@ -15,8 +15,10 @@ class CursesUI:
         self.debugger = debugger # Maybe move to the constructor?
 
     def menu(self):
-        return ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"];
-
+        menu = []
+        for item in ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"]:
+            menu.append(urwid.Text(item))
+        return menu
     def print_message(self, message):
         self.currentMessage = message
         self.messageBox.set_text(self.currentMessage)
@@ -38,8 +40,9 @@ class CursesUI:
         palette = [('header', 'white', 'black'),
                    ('reveal focus', 'black', 'dark cyan', 'standout'),]
         head = urwid.AttrMap(self.messageBox, 'header')
+        columns = urwid.Columns(self.menu())
         self.listbox = urwid.ListBox(self.content)
-        top = urwid.Frame(self.listbox, head)
+        top = urwid.Frame(self.listbox, head, columns)
         self.loop = urwid.MainLoop(top, palette,
                               input_filter=self.show_all_input, unhandled_input=self.exit_on_cr)
         self.loop.run()
