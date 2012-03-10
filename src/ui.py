@@ -9,7 +9,9 @@ class CursesUI:
         self.currentMessage = ""
         self.messageBox = urwid.Text(self.currentMessage, wrap='clip')
         self.content = urwid.SimpleListWalker([])
+        self.content_length = 0
         self.operations = {}
+        self.focus = 0;
 
     def set_debugger(self, debugger):
         self.debugger = debugger # Maybe move to the constructor?
@@ -24,9 +26,11 @@ class CursesUI:
         self.messageBox.set_text(self.currentMessage)
 
     def print_file(self, file_name, content, breakpoints = {}):
-        self.print_message(file_name)
-        for line in content.split('\n'):
-            self.content.append(urwid.Text(line, wrap='clip'))
+        del self.content[:]
+        lines = content.split('\n')
+        for line in lines:
+            self.content.append(urwid.AttrMap(urwid.Text(line, wrap='clip'), None, 'reveal focus'))
+        self.content_length = len(lines)
 
     def prompt(self):
         result = self.scr.getkey()
@@ -58,8 +62,13 @@ class CursesUI:
         if input == 'enter':
             raise urwid.ExitMainLoop()
             self.stop()
-        if input == 'down':
-            self.listbox.set_focus(1)
+        if input == 'down' and self.focus <= self.content_length:
+            self.listbox.set_focus(self.focus)
+            self.focus += 1
+        if input == 'up' and self.content_length > 0:
+            self.listbox.set_focus(self.focus)
+            self.focus -= 1
+
 
     def stop(self):
         self.run = False
