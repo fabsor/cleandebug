@@ -2,6 +2,7 @@ import SocketServer
 import threading
 from xml.dom.minidom import parseString
 from base64 import b64encode
+from pprint import PrettyPrinter
 import os
 
 class DBGPThread(threading.Thread):
@@ -59,9 +60,7 @@ class DebuggerConnection:
             command = "{0} -r {1}".format(command, hit_condition)
         if expression:
             command = "{0} -- {1}".format(command, b64encode(hit_condition))
-        id = self.execute_command(command).getElementsByTagName("response")[0].getAttribute('id')
-        self.breakpoints[id] = id
-        return id
+        return self.execute_command(command).getElementsByTagName("response")[0].getAttribute('id')
 
     def execute_command(self, command):
         self.connection.sendall(command)
@@ -109,11 +108,15 @@ class Debugger:
         self.thread = None
         self.running = False
         self.connected = False
+        self.breakpoints = []
         self.operations = []
         self.operation_event = threading.Event()
         self.operation_lock = threading.Lock()
         ui.set_debugger(self)
-
+    
+    def add_breakpoint(self, breakpoint):
+        self.breakpoints.append(breakpoint)
+        
     def is_connected(self):
         return self.connected
 
@@ -123,57 +126,72 @@ class Debugger:
         self.thread.start()
 
     def stop(self):
-        self.release()
+        self.disconnect()
         self.ui.print_message("SHUTTING DOWN")
         if self.thread:
             self.thread.stop()
         self.ui.stop()
     
     def execute_operation(self, operation):
+        """
+        Add an operation that is to be executed in the current connection.
+        """
         with self.operation_lock:
             self.operations.append(operation)
         self.operation_event.set()
         
-    
     def handle_connection(self, con):
         self.con = con
         self.connected = True
-        file = self.find_file(con.fileUri)
-        self.ui.print_file(file, self.open_file(file))
+        file_name = self.find_file(con.fileUri)
+        self.ui.print_file(file_name, self.open_file(file_name, True))
+        
+        # Add all breakpoints
+        for breakpoint in self.breakpoints:
+            result = breakpoint.execute(self.create_client_path, self.con)
+            self.ui.print_message(breakpoint.file_name)
         self.run()
     
     def run(self):
         """
         Run loop.
         """
-        self.running = True
-        while self.running:
+        while self.connected:
             self.execute_operations()
             self.operation_event.wait()
 
     def execute_operations(self):
+        """
+        Execute all queued operations.
+        """
         while len(self.operations) > 0:
             with self.operation_lock:
                 item = self.operations.pop();
             item.run()
     
-    def release(self):
+    def disconnect(self):
         """
-        Release any locks we might have.
+        Disconnect from the current connection
         """
-        self.running = False
-            
-    def find_file(self, fileUri):
+        self.connected = False
+        self.con = None
+     
+    def create_client_path(self, file_path):
+        return "{0}/{1}".format(self.client_base_path, file_path)
+     
+    def find_file(self, file_uri):
         # Split the path into path
-        parts = str(fileUri).split('/')
+        parts = str(file_uri).split('/')
         # Go down the path until we find the common base directory.
         # The first three parts are useless since the return values of dbgp
         # are file:///.
-        for i in range(len(parts[3:])):
-            if len(parts) > i+3:
-                current_path = "{0}/{1}".format(self.base_path, parts[i+3])
-                if os.path.exists(current_path):
-                    return current_path
+        for i, part in enumerate(reversed(parts[3:])):
+            current_path = "{0}/{1}".format(self.base_path, part)
+            if os.path.exists(current_path):
+                position = len(parts)-(i+1)
+                self.client_base_path = '/'.join(parts[0:position])
+                # return the relative path, it's easier to work with when setting breakpoints.
+                return '/'.join(parts[position:])
         return False
 
     def open_file(self, file, relative=False):
@@ -184,6 +202,22 @@ class Debugger:
             return handle.read()
         except:
             return False
+
+class LineBreakPoint:
+    """
+    This class represents a line breakpoint.
+    """
+    def __init__(self, file_name, line_number):
+        self.file_name = file_name
+        self.line_number = line_number
+        self.enabled = True
+    
+    def toggle(self):
+        self.enabled = not self.enabled
+        
+    def execute(self, base_path_fn, con):
+        return con.execute_command("breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(con.transaction_id, "line",
+                                                                               self.line_number, base_path_fn(self.file_name), int(self.enabled)))
 
 class RunOperation():
     def __init__(self, debugger):
@@ -200,4 +234,5 @@ class BreakPointOperation():
         self.args = args
     
     def run(self):
-        self.debugger.con.set_breakpoint(self.file, self.args)
+        result = self.debugger.set_breakpoint(self.file, self.args)
+        self.id = result.getElementsByTagName("response")[0].getAttribute('id')

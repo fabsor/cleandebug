@@ -1,5 +1,6 @@
 import urwid
 import debugger
+from debugger import LineBreakPoint
 class CursesUI:
     """
     A curses UI for the debugger.
@@ -16,6 +17,7 @@ class CursesUI:
         self.stateMachine.add_mode(FileExplorerMode(self))
         self.stateMachine.add_mode(ExitMode(self))
         self.stateMachine.add_mode(RunMode(self))
+        self.file_loaded = False
         self.focus = 0;
 
     def set_debugger(self, debugger):
@@ -36,6 +38,8 @@ class CursesUI:
         for line in lines:
             self.content.append(urwid.AttrMap(urwid.Text(line, wrap='clip'), None, 'reveal focus'))
         self.content_length = len(lines)
+        self.file_loaded = True
+        self.file_name = file_name
 
     def start(self):
         palette = [('header', 'white', 'black'),
@@ -130,16 +134,18 @@ class FileExplorerMode(Mode):
         self.ui = ui
 
     def evaluate(self, text):
-        return self.ui.frame.focus_part == 'body' and (not text or text == 'down' or text == 'up')
+        return self.ui.frame.focus_part == 'body' and (not text or text == 'down' or text == 'up' or text == ' ') and self.ui.file_loaded
     
     def handle_input(self, text):
         if text == 'down' and self.ui.focus <= self.ui.content_length:
-            self.ui.listbox.set_focus(self.ui.focus)
+            self.ui.content.set_focus(self.ui.focus)
             self.ui.focus += 1
         if text == 'up' and self.ui.content_length > 0:
-            self.ui.listbox.set_focus(self.ui.focus)
+            self.ui.content.set_focus(self.ui.focus)
             self.ui.focus -= 1
-        return True
+        if text == ' ':
+            self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, self.ui.focus))
+            self.ui.print_message("Breakpoint set at line {0}".format(self.ui.focus))
     
     def __str__(self):
         return "FileExplorerMode"
@@ -175,7 +181,7 @@ class OpenFileMode(Mode):
         if text == "enter":
             # When we catch an enter command, swap the focus.
             self.ui.frame.set_focus('body')
-            self.ui.print_file(text, self.ui.debugger.open_file(self.file, True), {})
+            self.ui.print_file(self.file, self.ui.debugger.open_file(self.file, True), {})
             self.ui.input.set_caption(u"")
             self.ui.input.set_edit_text(u"")
             self.machine.set_previous_mode()
