@@ -10,10 +10,7 @@ class DBGPThread(threading.Thread):
         self.server = DBGPServer(connection, connection_fn)
 
     def run(self):
-        try:
-            self.server.serve_forever(0.5)
-        except KeyboardInterrupt:
-            self.server.shutdown()
+        self.server.serve_forever(0.5)
 
     def stop(self):
         self.server.shutdown()
@@ -110,6 +107,7 @@ class Debugger:
         self.port = 9000
         self.host = host
         self.thread = None
+        self.alive = True
 
     def start(self):
         self.thread = DBGPThread((self.host, int(self.port)), self.handle_connection)
@@ -117,10 +115,11 @@ class Debugger:
         self.thread.start()
 
     def stop(self):
-        self.ui.print_message("SHUTTING DOWN")
-        self.thread.stop()
-        del self.thread
-        self.ui.stop()
+        if self.alive:
+            self.ui.print_message("SHUTTING DOWN")
+            self.thread.stop()
+            self.ui.stop()
+            self.alive = False
 
     def handle_connection(self, con):
         self.con = con
