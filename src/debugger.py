@@ -10,12 +10,13 @@ class DBGPThread(threading.Thread):
         self.server = DBGPServer(connection, connection_fn)
 
     def run(self):
-        self.server.serve_forever()
+        try:
+            self.server.serve_forever(0.5)
+        except KeyboardInterrupt:
+            self.server.shutdown()
 
     def stop(self):
-        # self.server.shutdown()
-        print "Die!"
-        del self.server
+        self.server.shutdown()
 
 class DBGPServer(SocketServer.TCPServer):
     def __init__(self, connection, connection_fn):

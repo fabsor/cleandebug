@@ -17,7 +17,7 @@ class CursesUI:
         self.debugger = debugger # Maybe move to the constructor?
 
     def menu(self):
-        return ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"];
+        return ["(O)pen file", "E(x)it", "<SPACE> Set breakpoint", "(R)un"];
 
     def header(self, message, show_menu = True):
         max = self.scr.getmaxyx()
@@ -50,7 +50,6 @@ class CursesUI:
         if result == "o":
             self.print_message("Enter the path to the file to open")
         elif result == "x":
-            self.print_message("yoyoyoyo")
             self.debugger.stop()
 
     def start(self):
