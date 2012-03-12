@@ -32,7 +32,7 @@ class CursesUI:
         self.currentMessage = message
         self.messageBox.set_text(self.currentMessage)
 
-    def print_file(self, file_name, content, breakpoints = {}):
+    def print_file(self, file_name, content, breakpoints = []):
         del self.content[:]
         lines = content.split('\n')
         for line in lines:
@@ -41,6 +41,8 @@ class CursesUI:
             text_line._selectable = True
             text_line.keypress = self.line_press
             self.content.append(urwid.AttrMap(text_line, None, 'reveal focus'))
+        for breakpoint in breakpoints:
+            self.content[breakpoint.line_number-1].set_attr_map({ None: 'streak' })
         self.content_length = len(lines)
         self.file_loaded = True
         self.file_name = file_name

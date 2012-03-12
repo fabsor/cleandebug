@@ -238,7 +238,7 @@ class RunOperation():
             current_file = self.debugger.find_file(result['filename'])
             if (self.debugger.ui.file_name != current_file):
                 self.debugger.ui.print_message(current_file)
-                self.debugger.ui.print_file(current_file, self.debugger.open_file(current_file, True))
+                self.debugger.ui.print_file(current_file, self.debugger.open_file(current_file, True), self.debugger.breakpoints[current_file])
             self.debugger.ui.trigger_breakpoint(result['lineno'])
         else:
             self.debugger.ui.print_message("Status: {0}".format(result['status']))
