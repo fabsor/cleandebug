@@ -150,11 +150,12 @@ class Debugger:
         self.con = con
         self.connected = True
         file_name = self.find_file(con.fileUri)
-        self.ui.print_message("Connected to {0}".format(con.session))
+        self.ui.print_message("Connected!".format(con.session))
         self.ui.print_file(file_name, self.open_file(file_name, True))
         # Add all breakpoints
         for breakpoint in self.breakpoints:
             result = breakpoint.execute(self.create_client_path, self.con)
+            self.ui.print_message(self.create_client_path(breakpoint.file_name))
         self.run()
     
     def run(self):
@@ -232,6 +233,10 @@ class RunOperation():
         result = self.debugger.con.run()
         if result['status'] == u"break":
             self.debugger.ui.print_message("Breakpoint triggered at line {0}".format(result['lineno']))
+            current_file = self.debugger.find_file(result['filename'])
+            if (self.debugger.ui.file_name != current_file):
+                self.debugger.ui.print_message(current_file)
+                self.debugger.ui.print_file(current_file, self.debugger.open_file(current_file, True))
             self.debugger.ui.trigger_breakpoint(result['lineno'])
         else:
             self.debugger.ui.print_message("Status: {0}".format(result['status']))

@@ -36,10 +36,22 @@ class CursesUI:
         del self.content[:]
         lines = content.split('\n')
         for line in lines:
-            self.content.append(urwid.AttrMap(urwid.Text(line), None, 'reveal focus'))
+            text_line = urwid.Text(line)
+            # @todo: This is pretty crappy, we should create our own widget.
+            text_line._selectable = True
+            text_line.keypress = self.line_press
+            self.content.append(urwid.AttrMap(text_line, None, 'reveal focus'))
         self.content_length = len(lines)
         self.file_loaded = True
         self.file_name = file_name
+    
+    def line_press(self, size, key):
+        focus = self.content.get_focus()[1]
+        if key == "down" and len(self.content) < focus:
+            self.content.set_focus(self.content.get_next(focus)[1])
+        if key == "up" and focus > 0:
+            self.content.set_focus(self.content.get_prev(focus)[1])
+        return key
     
     def trigger_breakpoint(self, line):
         line -= 1
@@ -144,17 +156,12 @@ class FileExplorerMode(Mode):
         return self.ui.frame.focus_part == 'body' and (not text or text == 'down' or text == 'up' or text == ' ') and self.ui.file_loaded
     
     def handle_input(self, text):
-        if text == 'down' and self.ui.focus <= self.ui.content_length:
-            self.ui.content.set_focus(self.ui.focus)
-            self.ui.focus += 1
-        if text == 'up' and self.ui.content_length > 0:
-            self.ui.content.set_focus(self.ui.focus)
-            self.ui.focus -= 1
         if text == ' ':
-            focused = self.ui.content.get_focus()[0]
+            focused, position = self.ui.content.get_focus()
             focused.set_attr_map({ None: 'streak' })
-            self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, self.ui.focus))
-            self.ui.print_message("Breakpoint set at line {0}".format(self.ui.focus))
+            position += 1
+            self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, position))
+            self.ui.print_message("Breakpoint set at line {0}".format(position))
     
     def __str__(self):
         return "FileExplorerMode"
