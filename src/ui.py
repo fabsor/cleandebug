@@ -42,6 +42,7 @@ class CursesUI:
         self.file_name = file_name
     
     def trigger_breakpoint(self, line):
+        line -= 1
         if line < self.content_length:
             self.content[line].set_attr_map({ None: 'triggered' })
 
