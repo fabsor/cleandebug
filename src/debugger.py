@@ -114,14 +114,16 @@ class Debugger:
         self.thread = None
         self.running = False
         self.connected = False
-        self.breakpoints = []
+        self.breakpoints = {}
         self.operations = []
         self.operation_event = threading.Event()
         self.operation_lock = threading.Lock()
         ui.set_debugger(self)
     
     def add_breakpoint(self, breakpoint):
-        self.breakpoints.append(breakpoint)
+        if not breakpoint.file_name in self.breakpoints.keys():
+            self.breakpoints[breakpoint.file_name] = []
+        self.breakpoints[breakpoint.file_name].append(breakpoint)
         
     def is_connected(self):
         return self.connected
@@ -153,9 +155,9 @@ class Debugger:
         self.ui.print_message("Connected!".format(con.session))
         self.ui.print_file(file_name, self.open_file(file_name, True))
         # Add all breakpoints
-        for breakpoint in self.breakpoints:
-            result = breakpoint.execute(self.create_client_path, self.con)
-            self.ui.print_message(self.create_client_path(breakpoint.file_name))
+        for file in self.breakpoints.itervalues():
+            for breakpoint in file:
+                result = breakpoint.execute(self.create_client_path, self.con)
         self.run()
     
     def run(self):
