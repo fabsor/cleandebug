@@ -226,13 +226,3 @@ class RunOperation():
     def run(self):
         result = self.debugger.con.run()
         self.debugger.ui.print_message(result)
-
-class BreakPointOperation():
-    def __init__(self, debugger, file, **args):
-        self.debugger = debugger
-        self.file = file
-        self.args = args
-    
-    def run(self):
-        result = self.debugger.set_breakpoint(self.file, self.args)
-        self.id = result.getElementsByTagName("response")[0].getAttribute('id')
