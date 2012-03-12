@@ -50,7 +50,7 @@ class CursesUI:
         if key == "down" and len(self.content) < focus:
             self.content.set_focus(self.content.get_next(focus)[1])
         if key == "up" and focus > 0:
-            self.content.set_focus(self.content.get_prev(focus)[1])
+            self.content.set_focus(focus)
         return key
     
     def trigger_breakpoint(self, line):
