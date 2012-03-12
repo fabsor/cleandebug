@@ -8,7 +8,7 @@ class CursesUI:
     def __init__(self):
         self.debugger = None
         self.currentMessage = ""
-        self.messageBox = urwid.Text(self.currentMessage, wrap='clip')
+        self.messageBox = urwid.Text(self.currentMessage)
         self.content = urwid.SimpleListWalker([])
         self.input = urwid.Edit()
         self.content_length = 0
@@ -36,14 +36,20 @@ class CursesUI:
         del self.content[:]
         lines = content.split('\n')
         for line in lines:
-            self.content.append(urwid.AttrMap(urwid.Text(line, wrap='clip'), None, 'reveal focus'))
+            self.content.append(urwid.AttrMap(urwid.Text(line), None, 'reveal focus'))
         self.content_length = len(lines)
         self.file_loaded = True
         self.file_name = file_name
+    
+    def trigger_breakpoint(self, line):
+        if line < self.content_length:
+            self.content[line].set_attr_map({ None: 'triggered' })
 
     def start(self):
         palette = [('header', 'white', 'black'),
-                   ('reveal focus', 'black', 'dark cyan', 'standout'),]
+                   ('reveal focus', 'black', 'dark cyan', 'standout'),
+                   ('streak', 'black', 'dark red', 'standout'),
+                   ('triggered', 'black', 'dark green', 'standout')]
         head = urwid.AttrMap(self.messageBox, 'header')
         columns = urwid.Columns(self.menu())
         footer = urwid.Pile([columns, self.input])
@@ -144,6 +150,8 @@ class FileExplorerMode(Mode):
             self.ui.content.set_focus(self.ui.focus)
             self.ui.focus -= 1
         if text == ' ':
+            focused = self.ui.content.get_focus()[0]
+            focused.set_attr_map({ None: 'streak' })
             self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, self.ui.focus))
             self.ui.print_message("Breakpoint set at line {0}".format(self.ui.focus))
     
@@ -184,6 +192,7 @@ class OpenFileMode(Mode):
             self.ui.print_file(self.file, self.ui.debugger.open_file(self.file, True), {})
             self.ui.input.set_caption(u"")
             self.ui.input.set_edit_text(u"")
+            self.ui.print_message("Opened file {0}".format(self.file))
             self.machine.set_previous_mode()
 
     def __str__(self):

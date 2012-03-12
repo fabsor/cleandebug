@@ -85,7 +85,13 @@ class DebuggerConnection:
         return self.execute_command("status -i {0}\0".format(self.transaction_id)).getElementsByTagName("response")[0].getAttribute('status')
 
     def run(self):
-        return self.execute_command("run -i {0}\0".format(self.transaction_id)).getElementsByTagName("response")[0].getAttribute('status')
+        result = self.execute_command("run -i {0}\0".format(self.transaction_id))
+        response = result.getElementsByTagName("response")[0]
+        data = { 'status': response.getAttribute('status') }
+        if data['status'] == u'break':
+            breakpoint = result.getElementsByTagName("xdebug:message")[0]
+            data = {'status': data['status'], 'filename': breakpoint.getAttribute('filename'), 'lineno': int(breakpoint.getAttribute('lineno')) }
+        return data
 
     def initialize(self):
         dom = self.receive()
@@ -144,12 +150,11 @@ class Debugger:
         self.con = con
         self.connected = True
         file_name = self.find_file(con.fileUri)
+        self.ui.print_message("Connected to {0}".format(con.session))
         self.ui.print_file(file_name, self.open_file(file_name, True))
-        
         # Add all breakpoints
         for breakpoint in self.breakpoints:
             result = breakpoint.execute(self.create_client_path, self.con)
-            self.ui.print_message(breakpoint.file_name)
         self.run()
     
     def run(self):
@@ -216,8 +221,8 @@ class LineBreakPoint:
         self.enabled = not self.enabled
         
     def execute(self, base_path_fn, con):
-        return con.execute_command("breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(con.transaction_id, "line",
-                                                                               self.line_number, base_path_fn(self.file_name), int(self.enabled)))
+        result = con.execute_command("breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(con.transaction_id, "line",                                                                      self.line_number, base_path_fn(self.file_name), int(self.enabled)))
+        self.id = result.getElementsByTagName("response")[0].getAttribute('id')
 
 class RunOperation():
     def __init__(self, debugger):
@@ -225,4 +230,8 @@ class RunOperation():
     
     def run(self):
         result = self.debugger.con.run()
-        self.debugger.ui.print_message(result)
+        if result['status'] == u"break":
+            self.debugger.ui.print_message("Breakpoint triggered at line {0}".format(result['lineno']))
+            self.debugger.ui.trigger_breakpoint(result['lineno'])
+        else:
+            self.debugger.ui.print_message("Status: {0}".format(result['status']))
