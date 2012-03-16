@@ -10,8 +10,8 @@ class CursesUI:
         self.currentMessage = ""
         self.messageBox = urwid.Text(self.currentMessage)
         self.content = urwid.SimpleListWalker([])
+        self.context = urwid.SimpleListWalker([])
         self.input = urwid.Edit()
-        self.content_length = 0
         self.stateMachine = StateMachine(self)
         self.stateMachine.add_mode(OpenFileMode(self))
         self.stateMachine.add_mode(FileExplorerMode(self))
@@ -19,45 +19,44 @@ class CursesUI:
         self.stateMachine.add_mode(RunMode(self))
         self.file_loaded = False
         self.focus = 0;
+        self.loop = None
 
     def set_debugger(self, debugger):
         self.debugger = debugger # Maybe move to the constructor?
 
     def menu(self):
         menu = []
-        for item in ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un"]:
+        for item in ["(O)pen file", "(E)xit", "<SPACE> Set breakpoint", "(R)un", "(V)ariables"]:
             menu.append(urwid.Text(item))
         return menu
     def print_message(self, message):
         self.currentMessage = message
         self.messageBox.set_text(self.currentMessage)
+        
+    def refresh(self):
+        if self.loop:
+            self.loop.draw_screen()
 
     def print_file(self, file_name, content, breakpoints = []):
         del self.content[:]
         lines = content.split('\n')
         for line in lines:
-            text_line = urwid.Text(line)
-            # @todo: This is pretty crappy, we should create our own widget.
-            text_line._selectable = True
-            text_line.keypress = self.line_press
+            text_line = SelectableText(line, self.content)
             self.content.append(urwid.AttrMap(text_line, None, 'reveal focus'))
         for breakpoint in breakpoints:
             self.content[breakpoint.line_number-1].set_attr_map({ None: 'streak' })
-        self.content_length = len(lines)
         self.file_loaded = True
         self.file_name = file_name
-    
-    def line_press(self, size, key):
-        focus = self.content.get_focus()[1]
-        if key == "down" and len(self.content) < focus:
-            self.content.set_focus(self.content.get_next(focus)[1])
-        if key == "up" and focus > 0:
-            self.content.set_focus(focus)
-        return key
+
+    def print_context(self, context):
+        del self.context[:]
+        for name,attributes in context.iteritems():
+            text_line = SelectableText(name, self.content)
+            self.context.append(urwid.AttrMap(text_line, None, 'reveal focus'))
     
     def trigger_breakpoint(self, line):
         line -= 1
-        if line < self.content_length:
+        if line < len(self.content):
             self.content[line].set_attr_map({ None: 'triggered' })
 
     def start(self):
@@ -69,7 +68,8 @@ class CursesUI:
         columns = urwid.Columns(self.menu())
         footer = urwid.Pile([columns, self.input])
         self.listbox = urwid.ListBox(self.content)
-        self.frame = urwid.Frame(self.listbox, head, footer)
+        self.context_box = urwid.ListBox(self.context)
+        self.frame = urwid.Frame(urwid.Columns([self.listbox, self.context_box]), head, footer)
         self.loop = urwid.MainLoop(self.frame, palette, unhandled_input=self.stateMachine.handle_input)
         self.stateMachine.evaluate_modes()
         self.loop.run()
@@ -77,6 +77,19 @@ class CursesUI:
     def stop(self):
         self.run = False
 
+class SelectableText(urwid.Text):
+    def __init__(self, value, listWalker):
+        urwid.Text.__init__(self, value)
+        self._selectable = True
+        self.listWalker = listWalker
+
+    def keypress(self, size, key):
+        focus = self.listWalker.get_focus()[1]
+        if key == "down" and len(self.listWalker) < focus:
+            self.listWalker.set_focus(self.listWalker.get_next(focus)[1])
+        if key == "up" and focus > 0:
+            self.listWalker.set_focus(focus)
+        return key
 
 class StateMachine:
     """
@@ -167,6 +180,33 @@ class FileExplorerMode(Mode):
     
     def __str__(self):
         return "FileExplorerMode"
+
+class VariableExplorerMode(Mode):
+    def __init__(self, ui):
+        self.ui = ui
+
+    def locked(self):
+        return True
+
+    def enter(self, stateMachine):
+        self.machine = stateMachine
+        for name, info in self.debugger.context.iteritems():
+            pass
+
+    def evaluate(self, text):
+        return text == 'v'
+    
+    def handle_input(self, text):
+        if text == ' ':
+            focused, position = self.ui.content.get_focus()
+            focused.set_attr_map({ None: 'streak' })
+            position += 1
+            self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, position))
+            self.ui.print_message("Breakpoint set at line {0}".format(position))
+    
+    def __str__(self):
+        return "FileExplorerMode"
+
 
 class OpenFileMode(Mode):
     """

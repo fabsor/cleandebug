@@ -1,7 +1,7 @@
 import SocketServer
 import threading
 from xml.dom.minidom import parseString
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from pprint import PrettyPrinter
 import os
 
@@ -92,6 +92,32 @@ class DebuggerConnection:
             breakpoint = result.getElementsByTagName("xdebug:message")[0]
             data = {'status': data['status'], 'filename': breakpoint.getAttribute('filename'), 'lineno': int(breakpoint.getAttribute('lineno')) }
         return data
+
+    def get_context(self, stack_depth = None, context_id = None):
+        result = self.execute_command("context_get -i {0}\0".format(self.transaction_id));
+        properties = {}
+        for property_element in result.getElementsByTagName("property"):
+            dbg_property = {}
+            """
+            name="short_name"
+            fullname="long_name"
+            type="data_type"
+            classname="name_of_object_class"
+            constant="0|1"
+            children="0|1"
+            size="{NUM}"
+            page="{NUM}"
+            pagesize="{NUM}"
+            address="{NUM}"
+            key="language_dependent_key"
+            encoding="base64|none"
+            numchildren="{NUM}">
+            """
+            for name in ["name", "fullname", "data_type", "classname", "constant", "children", "size", "page", "pagesize", "address", "key", "encoding", "numchildren"]:
+                dbg_property[name] = property_element.getAttribute(name)
+            #dbg_property["data"] = b64decode(property_element.nodeValue)
+            properties[dbg_property["fullname"]] = dbg_property
+        return properties
 
     def initialize(self):
         dom = self.receive()
@@ -235,10 +261,12 @@ class RunOperation():
         result = self.debugger.con.run()
         if result['status'] == u"break":
             self.debugger.ui.print_message("Breakpoint triggered at line {0}".format(result['lineno']))
+            self.debugger.context = self.debugger.con.get_context()
             current_file = self.debugger.find_file(result['filename'])
             if (self.debugger.ui.file_name != current_file):
-                self.debugger.ui.print_message(current_file)
+                #self.debugger.ui.print_message(current_file)
                 self.debugger.ui.print_file(current_file, self.debugger.open_file(current_file, True), self.debugger.breakpoints[current_file])
             self.debugger.ui.trigger_breakpoint(result['lineno'])
+            self.debugger.ui.print_context(self.debugger.context)
         else:
             self.debugger.ui.print_message("Status: {0}".format(result['status']))
