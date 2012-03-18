@@ -1,6 +1,8 @@
 import urwid
 import debugger
+from pprint import PrettyPrinter
 from debugger import LineBreakPoint
+
 class CursesUI:
     """
     A curses UI for the debugger.
@@ -10,7 +12,7 @@ class CursesUI:
         self.currentMessage = ""
         self.messageBox = urwid.Text(self.currentMessage)
         self.content = urwid.SimpleListWalker([])
-        self.context = urwid.SimpleListWalker([])
+        self.context_view = ContextView()
         self.input = urwid.Edit()
         self.stateMachine = StateMachine(self)
         self.stateMachine.add_mode(OpenFileMode(self))
@@ -32,7 +34,7 @@ class CursesUI:
     def print_message(self, message):
         self.currentMessage = message
         self.messageBox.set_text(self.currentMessage)
-        
+
     def refresh(self):
         if self.loop:
             self.loop.draw_screen()
@@ -48,12 +50,9 @@ class CursesUI:
         self.file_loaded = True
         self.file_name = file_name
 
-    def print_context(self, context):
-        del self.context[:]
-        for name,attributes in context.iteritems():
-            text_line = SelectableText(name, self.content)
-            self.context.append(urwid.AttrMap(text_line, None, 'reveal focus'))
-    
+    def print_context(self, context_names, context):
+        self.context_view.render_view(context_names, context)
+
     def trigger_breakpoint(self, line):
         line -= 1
         if line < len(self.content):
@@ -68,8 +67,7 @@ class CursesUI:
         columns = urwid.Columns(self.menu())
         footer = urwid.Pile([columns, self.input])
         self.listbox = urwid.ListBox(self.content)
-        self.context_box = urwid.ListBox(self.context)
-        self.frame = urwid.Frame(urwid.Columns([self.listbox, self.context_box]), head, footer)
+        self.frame = urwid.Frame(urwid.Columns([self.listbox, self.context_view]), head, footer)
         self.loop = urwid.MainLoop(self.frame, palette, unhandled_input=self.stateMachine.handle_input)
         self.stateMachine.evaluate_modes()
         self.loop.run()
@@ -91,6 +89,30 @@ class SelectableText(urwid.Text):
             self.listWalker.set_focus(focus)
         return key
 
+class ContextView(urwid.Frame):
+    """
+    This is a view for displaying the current debugger context.
+    """
+    def __init__(self):
+        self.content = urwid.SimpleListWalker([])
+        self.content_box = urwid.ListBox(self.content)
+        self.menu = urwid.Columns([])
+        urwid.Frame.__init__(self, self.content_box, self.menu)
+
+    def render_view(self, context_names, context):
+        """
+        Render the view with a set of context names and a context.
+        """
+        del self.content[:]
+        for context_name in context_names:
+            self.menu.widget_list.append(urwid.Button(context_name["name"], self.change_context))
+        for name,attributes in context.iteritems():
+            text_line = SelectableText(name, self.content)
+            self.content.append(urwid.AttrMap(text_line, None, 'reveal focus'))
+
+    def change_context(self):
+        pass
+
 class StateMachine:
     """
     This simple state machine keeps track of what mode we are currently in.
@@ -99,13 +121,13 @@ class StateMachine:
         self.ui = ui
         self.modes = []
         self.current_mode = None
-    
+
     def add_mode(self, mode):
         self.modes.append(mode)
 
     def remove_mode(self, mode):
         self.modes.remove(mode)
-  
+
     def evaluate_modes(self, text=None):
         for mode in self.modes:
             if mode.evaluate(text):
@@ -120,43 +142,43 @@ class StateMachine:
 
     def set_previous_mode(self):
         self.current_mode = self.previous_mode
-        
+
     def set_mode(self, mode):
         self.previous_mode= self.current_mode
         self.current_mode = mode
         # If the class has a method called enter, go ahead and call it.
         if hasattr(mode, "enter") and callable(getattr(mode, "enter")):
             self.current_mode.enter(self)
-        
+
 
 class Mode:
     def __init__(self, ui):
         self.ui = ui
-    
+
     def locked(self):
         return False
 
 class ExitMode(Mode):
     def __init__(self, ui):
         self.ui = ui
-        
+
     def evaluate(self, text):
         return text == 'x'
-    
+
     def enter(self, stateMachine):
         raise urwid.ExitMainLoop()
-        self.stop()        
+        self.stop()
 
     def __str__(self):
         return "ExitMode"
-    
+
 class RunMode(Mode):
     def __init__(self, ui):
         self.ui = ui
-        
+
     def evaluate(self, text):
         return text == 'r' and self.ui.debugger.is_connected()
-    
+
     def enter(self, stateMachine):
         self.ui.debugger.execute_operation(debugger.RunOperation(self.ui.debugger))
 
@@ -169,7 +191,7 @@ class FileExplorerMode(Mode):
 
     def evaluate(self, text):
         return self.ui.frame.focus_part == 'body' and (not text or text == 'down' or text == 'up' or text == ' ') and self.ui.file_loaded
-    
+
     def handle_input(self, text):
         if text == ' ':
             focused, position = self.ui.content.get_focus()
@@ -177,7 +199,7 @@ class FileExplorerMode(Mode):
             position += 1
             self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, position))
             self.ui.print_message("Breakpoint set at line {0}".format(position))
-    
+
     def __str__(self):
         return "FileExplorerMode"
 
@@ -195,7 +217,7 @@ class VariableExplorerMode(Mode):
 
     def evaluate(self, text):
         return text == 'v'
-    
+
     def handle_input(self, text):
         if text == ' ':
             focused, position = self.ui.content.get_focus()
@@ -203,7 +225,7 @@ class VariableExplorerMode(Mode):
             position += 1
             self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, position))
             self.ui.print_message("Breakpoint set at line {0}".format(position))
-    
+
     def __str__(self):
         return "FileExplorerMode"
 
@@ -215,26 +237,26 @@ class OpenFileMode(Mode):
     """
     def __init__(self, ui):
         self.ui = ui
-    
+
     def evaluate(self, text):
         return text == "o"
-    
+
     def locked(self):
         """
         This mode is locked until it releases itself.
         """
         return True
-    
+
     def enter(self, state_machine):
         self.machine = state_machine
         self.ui.input.set_caption(u"Path to file:")
         self.ui.frame.set_focus('footer')
         urwid.connect_signal(self.ui.input, 'change', self.handle_text_input)
-    
+
     def handle_text_input(self, edit, text):
         assert edit is self.ui.input
         self.file = text
-        
+
     def handle_input(self, text):
         if text == "enter":
             # When we catch an enter command, swap the focus.

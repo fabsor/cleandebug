@@ -41,7 +41,7 @@ class DebuggerConnection:
         self.transaction_id = transaction_id
         self.breakpoints = {}
         self.initialize()
-        
+
     def set_breakpoint(self, file, lineNumber=-1, type="line", state="enabled", function=None, exception=None, hit_value=0, hit_condition=None, temporary=0, expression=None):
         """
         Set a breakpoint
@@ -93,26 +93,24 @@ class DebuggerConnection:
             data = {'status': data['status'], 'filename': breakpoint.getAttribute('filename'), 'lineno': int(breakpoint.getAttribute('lineno')) }
         return data
 
-    def get_context(self, stack_depth = None, context_id = None):
-        result = self.execute_command("context_get -i {0}\0".format(self.transaction_id));
+    def get_context_names(self, stack_depth = None):
+        """
+        Get the contexts that are currently available.
+        """
+        result = self.execute_command("context_names -i {0}\0".format(self.transaction_id))
+        contexts = []
+        for context_element in result.getElementsByTagName("context"):
+            contexts.append({"name": context_element.getAttribute("name"), "id": int(context_element.getAttribute("id"))});
+        return contexts
+
+    def get_context(self, context_id = 0, stack_depth = None):
+        """
+        Get the current context.
+        """
+        result = self.execute_command("context_get -d {0} -i {1}\0".format(stack_depth, self.transaction_id));
         properties = {}
         for property_element in result.getElementsByTagName("property"):
             dbg_property = {}
-            """
-            name="short_name"
-            fullname="long_name"
-            type="data_type"
-            classname="name_of_object_class"
-            constant="0|1"
-            children="0|1"
-            size="{NUM}"
-            page="{NUM}"
-            pagesize="{NUM}"
-            address="{NUM}"
-            key="language_dependent_key"
-            encoding="base64|none"
-            numchildren="{NUM}">
-            """
             for name in ["name", "fullname", "data_type", "classname", "constant", "children", "size", "page", "pagesize", "address", "key", "encoding", "numchildren"]:
                 dbg_property[name] = property_element.getAttribute(name)
             #dbg_property["data"] = b64decode(property_element.nodeValue)
@@ -145,12 +143,12 @@ class Debugger:
         self.operation_event = threading.Event()
         self.operation_lock = threading.Lock()
         ui.set_debugger(self)
-    
+
     def add_breakpoint(self, breakpoint):
         if not breakpoint.file_name in self.breakpoints.keys():
             self.breakpoints[breakpoint.file_name] = []
         self.breakpoints[breakpoint.file_name].append(breakpoint)
-        
+
     def is_connected(self):
         return self.connected
 
@@ -165,7 +163,7 @@ class Debugger:
         if self.thread:
             self.thread.stop()
         self.ui.stop()
-    
+
     def execute_operation(self, operation):
         """
         Add an operation that is to be executed in the current connection.
@@ -173,7 +171,7 @@ class Debugger:
         with self.operation_lock:
             self.operations.append(operation)
         self.operation_event.set()
-        
+
     def handle_connection(self, con):
         self.con = con
         self.connected = True
@@ -185,7 +183,7 @@ class Debugger:
             for breakpoint in file:
                 result = breakpoint.execute(self.create_client_path, self.con)
         self.run()
-    
+
     def run(self):
         """
         Run loop.
@@ -202,17 +200,17 @@ class Debugger:
             with self.operation_lock:
                 item = self.operations.pop();
             item.run()
-    
+
     def disconnect(self):
         """
         Disconnect from the current connection
         """
         self.connected = False
         self.con = None
-     
+
     def create_client_path(self, file_path):
         return "{0}/{1}".format(self.client_base_path, file_path)
-     
+
     def find_file(self, file_uri):
         # Split the path into path
         parts = str(file_uri).split('/')
@@ -245,10 +243,10 @@ class LineBreakPoint:
         self.file_name = file_name
         self.line_number = line_number
         self.enabled = True
-    
+
     def toggle(self):
         self.enabled = not self.enabled
-        
+
     def execute(self, base_path_fn, con):
         result = con.execute_command("breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(con.transaction_id, "line",                                                                      self.line_number, base_path_fn(self.file_name), int(self.enabled)))
         self.id = result.getElementsByTagName("response")[0].getAttribute('id')
@@ -256,17 +254,18 @@ class LineBreakPoint:
 class RunOperation():
     def __init__(self, debugger):
         self.debugger = debugger
-    
+
     def run(self):
         result = self.debugger.con.run()
         if result['status'] == u"break":
             self.debugger.ui.print_message("Breakpoint triggered at line {0}".format(result['lineno']))
-            self.debugger.context = self.debugger.con.get_context()
+            context_names = self.debugger.con.get_context_names()
+            context = self.debugger.con.get_context()
             current_file = self.debugger.find_file(result['filename'])
             if (self.debugger.ui.file_name != current_file):
                 #self.debugger.ui.print_message(current_file)
                 self.debugger.ui.print_file(current_file, self.debugger.open_file(current_file, True), self.debugger.breakpoints[current_file])
             self.debugger.ui.trigger_breakpoint(result['lineno'])
-            self.debugger.ui.print_context(self.debugger.context)
+            self.debugger.ui.print_context(context_names, context)
         else:
             self.debugger.ui.print_message("Status: {0}".format(result['status']))
