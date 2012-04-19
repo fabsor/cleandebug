@@ -7,12 +7,12 @@ class CursesUI:
     """
     A curses UI for the debugger.
     """
-    def __init__(self):
-        self.debugger = None
+    def __init__(self, debugger):
+        self.debugger = debugger
         self.currentMessage = ""
         self.messageBox = urwid.Text(self.currentMessage)
         self.content = urwid.SimpleListWalker([])
-        self.context_view = ContextView()
+        self.context_view = ContextView(debugger)
         self.input = urwid.Edit()
         self.stateMachine = StateMachine(self)
         self.stateMachine.add_mode(OpenFileMode(self))
@@ -22,9 +22,6 @@ class CursesUI:
         self.file_loaded = False
         self.focus = 0;
         self.loop = None
-
-    def set_debugger(self, debugger):
-        self.debugger = debugger # Maybe move to the constructor?
 
     def menu(self):
         menu = []
@@ -58,7 +55,7 @@ class CursesUI:
         if line < len(self.content):
             self.content[line].set_attr_map({ None: 'triggered' })
 
-    def start(self):
+    def start(self, host, port):
         palette = [('header', 'white', 'black'),
                    ('reveal focus', 'black', 'dark cyan', 'standout'),
                    ('streak', 'black', 'dark red', 'standout'),
@@ -70,6 +67,7 @@ class CursesUI:
         self.frame = urwid.Frame(urwid.Columns([self.listbox, self.context_view]), head, footer)
         self.loop = urwid.MainLoop(self.frame, palette, unhandled_input=self.stateMachine.handle_input)
         self.stateMachine.evaluate_modes()
+        self.debugger.start(host, port)
         self.loop.run()
 
     def stop(self):
@@ -93,10 +91,11 @@ class ContextView(urwid.Frame):
     """
     This is a view for displaying the current debugger context.
     """
-    def __init__(self):
+    def __init__(self, debugger):
         self.content = urwid.SimpleListWalker([])
         self.content_box = urwid.ListBox(self.content)
         self.menu = urwid.Columns([])
+        self.debugger = debugger
         urwid.Frame.__init__(self, self.content_box, self.menu)
 
     def render_view(self, context_names, context):
@@ -105,12 +104,12 @@ class ContextView(urwid.Frame):
         """
         del self.content[:]
         for context_name in context_names:
-            self.menu.widget_list.append(urwid.Button(context_name["name"], self.change_context))
+            self.menu.widget_list.append(urwid.Button(context_name["name"], self.change_context, context_name["id"]))
         for name,attributes in context.iteritems():
             text_line = SelectableText(name, self.content)
             self.content.append(urwid.AttrMap(text_line, None, 'reveal focus'))
 
-    def change_context(self):
+    def change_context(self, context_id):
         pass
 
 class StateMachine:
@@ -180,7 +179,18 @@ class RunMode(Mode):
         return text == 'r' and self.ui.debugger.is_connected()
 
     def enter(self, stateMachine):
-        self.ui.debugger.execute_operation(debugger.RunOperation(self.ui.debugger))
+        self.ui.debugger.execute_operation(debugger.RunOperation(self.ui.debugger, self.handleRun))
+
+    def handle_run(self, state):
+        if state.status == "status":
+            self.ui.print_message("Breakpoint triggered at line {0}".format(state.line_number))
+            if (self.ui.current_file != state.file):
+                self.ui.print_message(state.file_name)
+                self.ui.print_file(state.file_name, self.debugger.open_file(state.file_name, True), self.debugger.get_breakpoints(state.file_name))
+            self.debugger.ui.trigger_breakpoint(state.line_number)
+            self.debugger.ui.print_context(state.context_names, state.context)
+        else:
+            self.debugger.ui.print_message("Status: {0}".format(state.status))
 
     def __str__(self):
         return "RunMode"
@@ -202,33 +212,6 @@ class FileExplorerMode(Mode):
 
     def __str__(self):
         return "FileExplorerMode"
-
-class VariableExplorerMode(Mode):
-    def __init__(self, ui):
-        self.ui = ui
-
-    def locked(self):
-        return True
-
-    def enter(self, stateMachine):
-        self.machine = stateMachine
-        for name, info in self.debugger.context.iteritems():
-            pass
-
-    def evaluate(self, text):
-        return text == 'v'
-
-    def handle_input(self, text):
-        if text == ' ':
-            focused, position = self.ui.content.get_focus()
-            focused.set_attr_map({ None: 'streak' })
-            position += 1
-            self.ui.debugger.add_breakpoint(debugger.LineBreakPoint(self.ui.file_name, position))
-            self.ui.print_message("Breakpoint set at line {0}".format(position))
-
-    def __str__(self):
-        return "FileExplorerMode"
-
 
 class OpenFileMode(Mode):
     """
