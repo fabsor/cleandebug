@@ -55,7 +55,7 @@ class CursesUI:
         if line < len(self.content):
             self.content[line].set_attr_map({ None: 'triggered' })
 
-    def start(self, host, port):
+    def start(self):
         palette = [('header', 'white', 'black'),
                    ('reveal focus', 'black', 'dark cyan', 'standout'),
                    ('streak', 'black', 'dark red', 'standout'),
@@ -67,7 +67,7 @@ class CursesUI:
         self.frame = urwid.Frame(urwid.Columns([self.listbox, self.context_view]), head, footer)
         self.loop = urwid.MainLoop(self.frame, palette, unhandled_input=self.stateMachine.handle_input)
         self.stateMachine.evaluate_modes()
-        self.debugger.start(host, port)
+        self.debugger.start()
         self.loop.run()
 
     def stop(self):

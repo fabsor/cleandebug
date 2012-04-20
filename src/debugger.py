@@ -177,11 +177,11 @@ class DebuggerConnection:
 
 class Debugger:
     """
-    The debuggger class is the main class that can be used to listen for 
+    The debuggger class is the main class that can be used to listen for
     dbgp connections on a given port.
     >>> debugger = Debugger('.')
     """
-    def __init__(self, base_path, io_wrapper=OSIOWrapper()):
+    def __init__(self, base_path, host, port, io_wrapper=OSIOWrapper()):
         """
         @param base_path: the path from which the debugger should look for files.
         """
@@ -194,6 +194,9 @@ class Debugger:
         self.operations = []
         self.operation_event = threading.Event()
         self.operation_lock = threading.Lock()
+        self.handler = None
+        self.host = host
+        self.port = port
 
     def add_breakpoint(self, breakpoint):
         """
@@ -236,7 +239,7 @@ class Debugger:
         """
         return self.connected
 
-    def start(self, connection_handler):
+    def start(self):
         """
         Start listening for connections.
         >>> debugger = Debugger(".")
@@ -245,6 +248,7 @@ class Debugger:
         >>> connection_handler.started
         True
         """
+        return
         self.handler = connection_handler
         connection_handler.set_connection_handler(self.handle_connection)
         self.handler.start()
@@ -273,7 +277,7 @@ class Debugger:
 
     def handle_connection(self, con):
         """
-        Handle an incoming connection. 
+        Handle an incoming connection.
         This will process the queue of operations to perform.
         @con: An open dbgp connection.
         """
@@ -387,7 +391,7 @@ class LineBreakPoint:
         """
         Execute the command on the server.
         >>> breakpoint = LineBreakPoint("index.php", 1)
-        >>> 
+        >>>
         """
         result = con.execute_command("breakpoint_set -i {0} -t {1} -n {2} -f {3} -r {4}\0".format(con.transaction_id, "line",                                                                      self.line_number, base_path_fn(self.file_name), int(self.enabled)))
         self.id = result.getElementsByTagName("response")[0].getAttribute('id')
@@ -417,7 +421,7 @@ class RunOperation:
         context_names = self.debugger.con.get_context_names()
         context = self.debugger.con.get_context()
         current_file = self.debugger.find_file(result['filename'])
-        return DebuggerState(str(result['status']), current_file, context_names, context) 
+        return DebuggerState(str(result['status']), current_file, context_names, context)
 
 class ChangeContextOperation:
     """
@@ -426,7 +430,7 @@ class ChangeContextOperation:
     def __init__(self, debugger, context_id, callback_fn):
         self.debugger = debugger
         self.callback_fn = callback_fn
-    
+
     def run(self):
         context_names = self.debugger.con.get_context(context_id)
         self.callback_fn(context_names)
