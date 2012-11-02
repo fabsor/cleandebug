@@ -2,7 +2,7 @@
 import sys
 import optparse
 from src.debugger import *
-from src.ui import CursesUI
+import src.ui as ui
 
 if __name__ == "__main__":
     parser = optparse.OptionParser(description="DBGP debugger for PHP scripts")
@@ -11,10 +11,12 @@ if __name__ == "__main__":
     options, args = parser.parse_args()
     if len(args) < 1:
         parser.error("You need to specify a path")
-    debugger = Debugger(args[0], options.host, options.port)
-    ui = CursesUI(debugger);
+    #debugger = Debugger(args[0], options.host, options.port)
+
     try:
+        ui.MainWindow(None)
         ui.start()
     finally:
-        debugger.stop()
+        pass
+        #debugger.stop()
 
