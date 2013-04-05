@@ -3,6 +3,7 @@ import threading
 from xml.dom.minidom import parseString
 from base64 import b64encode
 import os
+import socket
 
 class DBGPThread(threading.Thread):
     def __init__(self, connection, connection_fn):
@@ -99,6 +100,17 @@ class DebuggerConnection:
         self.fileUri = init.getAttribute('fileuri')
         self.initialized = True
 
+class Client:
+    def __init__(self, socket, debugger):
+        self.sock = socket
+        self.debugger = debugger
+
+    def close(self):
+        self.sock.close()
+
+    def handle(self, data):
+        pass
+
 class Debugger:
     def __init__(self, base_path, ui, port=9000, host="127.0.0.1"):
         self.base_path = base_path
@@ -106,18 +118,21 @@ class Debugger:
         self.ui.set_debugger(self)
         self.port = 9000
         self.host = host
-        self.thread = None
         self.alive = True
+        self.clients = dict()
 
-    def start(self):
-        self.thread = DBGPThread((self.host, int(self.port)), self.handle_connection)
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((host, port))
+        self.server_socket.listen(5)
+
+        self.ui.start()
         self.ui.print_message("Listening on {}:{}".format(self.host, self.port))
-        self.thread.start()
 
     def stop(self):
         if self.alive:
             self.ui.print_message("SHUTTING DOWN")
-            self.thread.stop()
+            self.server_socket.shutdown( socket.SHUT_RDWR )
+            self.server_socket.close()
             self.ui.stop()
             self.alive = False
 
@@ -125,7 +140,6 @@ class Debugger:
         self.con = con
         file = self.find_file(con.fileUri)
         self.ui.print_file(file, self.open_file(file))
-        # action = self.ui.prompt()
 
     def find_file(self, fileUri):
         # Split the path into path
@@ -145,6 +159,29 @@ class Debugger:
             return handle.read()
         except:
             return False
+
+    # Socket magic
+    def new_client(self):
+        """Accept a new client"""
+        sock, addr = self.server_socket.accept()
+
+        self.ui.print_message("New connection from: {0}:{1}".format(addr[0], addr[1]))
+
+        self.clients[id(sock)] = Client(sock, self)
+        return sock
+
+    def handle_client(self, sock):
+        """Returns false if a socket should be removed from the event loop"""
+        data = sock.recv(4096) # Not sure
+
+        if data:
+            self.clients[id(sock)].handle(data)
+            return True
+        else:
+            self.clients[id(sock)].close()
+            del self.clients[id(sock)]
+            return False
+
 
 class DebuggerOperation:
     """
