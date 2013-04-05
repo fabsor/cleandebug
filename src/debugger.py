@@ -239,7 +239,7 @@ class Debugger:
         """
         return self.connected
 
-    def start(self):
+    def start(self, connection_handler):
         """
         Start listening for connections.
         >>> debugger = Debugger(".")
@@ -248,7 +248,7 @@ class Debugger:
         >>> connection_handler.started
         True
         """
-        return
+
         self.handler = connection_handler
         connection_handler.set_connection_handler(self.handle_connection)
         self.handler.start()

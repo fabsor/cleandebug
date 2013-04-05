@@ -41,22 +41,28 @@ class MainWindow(BaseWindow):
 
         # Code area
         # Set syntax high lightning
-        codebuffer = gtksourceview2.Buffer()
-        codebuffer.set_text(open("sample.php",'r').read())
+        self.codebuffer = gtksourceview2.Buffer()
+        #codebuffer.set_text(open("sample.php",'r').read())
         # To get all available: gtksourceview2.language_manager_get_default().get_language_ids()
 
-        codebuffer.set_language(gtksourceview2.language_manager_get_default().get_language('php')) # FIXME: add an menu later on for this
-        codebuffer.set_highlight_syntax(True)
+        self.codebuffer.set_language(gtksourceview2.language_manager_get_default().get_language('php')) # FIXME: add an menu later on for this
+        self.codebuffer.set_highlight_syntax(True)
 
-        self.text = gtksourceview2.View(codebuffer)
+        self.text = gtksourceview2.View(self.codebuffer)
         self.text.set_show_line_numbers(True)
 
         codebox.add(self.text)
 
-
         self.button = gtk.Button("Hello")
         codebox.add(self.button)
         self.window.show_all()
+
+    def open_file(path, string=None):
+        """Set the buffer to file contents or an string"""
+        if string:
+            self.codebuffer.set_text(string)
+
+        self.codebuffer.set_text(open(path, 'r').read())
 
 
 class HelloDialog:

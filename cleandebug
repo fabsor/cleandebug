@@ -11,12 +11,13 @@ if __name__ == "__main__":
     options, args = parser.parse_args()
     if len(args) < 1:
         parser.error("You need to specify a path")
-    #debugger = Debugger(args[0], options.host, options.port)
+    debugger = Debugger(args[0], options.host, options.port)
 
     try:
-        ui.MainWindow(None)
+        ui.MainWindow(debugger)
+        #debugger.start()
         ui.start()
     finally:
-        pass
         #debugger.stop()
+        pass
 
